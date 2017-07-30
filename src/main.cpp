@@ -1,3 +1,4 @@
+#include <cmath>
 #include <math.h>
 #include <uWS/uWS.h>
 #include <chrono>
@@ -9,23 +10,22 @@
 #include "MPC.h"
 #include "json.hpp"
 
+
+using namespace std;
+
+
 // for convenience
 using json = nlohmann::json;
 
 // For converting back and forth between radians and degrees.
-constexpr double pi() 
-{ 
-    return M_PI; 
-}
-
 double deg2rad(double x) 
 { 
-    return x * pi() / 180; 
+    return x * M_PI / 180;
 }
 
 double rad2deg(double x) 
 { 
-    return x * 180 / pi(); 
+    return x * 180 / M_PI;
 }
 
 // Checks if the SocketIO event has JSON data.
@@ -90,12 +90,12 @@ Eigen::VectorXd polyfit(
 
 int main() 
 {
-    uWS::Hub h;
+    uWS::Hub uWsHub;
 
     // MPC is initialized here!
     MPC mpc;
 
-    h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+    uWsHub.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
         uWS::OpCode opCode) 
     {
         // "42" at the start of the message means there's a websocket message event.
@@ -120,6 +120,9 @@ int main()
                     double psi = j[1]["psi"];
                     double v = j[1]["speed"];
 
+                    // TODO: unused?!? 
+                    double steer_value = j[1]["steering_angle"];
+
                     // shift car reference angle to 90 degrees
                     // actually the rotation is not with 90 degrees, but instead its 
                     // rotating around the yaw of the car
@@ -141,18 +144,18 @@ int main()
                     double* ptry = &ptsy[0];
                     Eigen::Map<Eigen::VectorXd> ptsy_transform(ptry, 6);
 
-                    auto coeffs = polyfit(ptsx_transform, ptsy_transform, 3);
+                    Eigen::VectorXd fittedPolyCoeffs = polyfit(ptsx_transform, ptsy_transform, 3);
 
                     // calculate cte and epsi
-                    double cte = polyeval(coeffs, 0);
+                    double cte = polyeval(fittedPolyCoeffs, 0);
 
                     //double epsi = psi - atan(coeffs[1] + 2 * px * coeffs[2] + 3 * coeffs[3] * pow(px, 2));
-                    double epsi = -atan(coeffs[1]); // simplified version of above line (because of previous shift and rotation)
+                    double epsi = -atan(fittedPolyCoeffs[1]); // simplified version of above line (because of previous shift and rotation)
 
-                    double steer_value = j[1]["steering_angle"];
                     
                     // throttle is not acceleration, but somehow an estimator for the acceleration
-                    double throttle_value = j[1]["throttle"]; 
+                    // TODO: unused?!? 
+                    //double throttle_value = j[1]["throttle"]; 
 
                     Eigen::VectorXd state(6);
                     state << 0, 0, 0, v, cte, epsi;
@@ -161,19 +164,19 @@ int main()
                     // Both are in between [-1, 1].
 
                     // the coefficients are the path that the vehicle wants to follow
-                    auto vars = mpc.Solve(state, coeffs);
+                    vector<double> vars = mpc.Solve(state, fittedPolyCoeffs);
 
-                    // next_x_vals and next_y_vals are used for visual debugging: it displays
+                    // next_x_vals and next_y_vals are used for visual debugging: they display
                     // the line that the vehicle is trying to follow as a yellow line
                     vector<double> next_x_vals;
                     vector<double> next_y_vals;
 
-                    double poly_inc = 2.5; // distance in x axis for which the polynomial is evaluated
-                    int num_points = 25; // 25 points should be displayed
+                    const double poly_inc = 2.5; // distance in x axis for which the polynomial is evaluated
+                    const int num_points = 25; // 25 points should be displayed
                     for (int i(1); i < num_points; ++i)
                     {
                         next_x_vals.push_back(poly_inc * i);
-                        next_y_vals.push_back(polyeval(coeffs, poly_inc * i));
+                        next_y_vals.push_back(polyeval(fittedPolyCoeffs, poly_inc * i));
                     }
 
                     // this will be the green line
@@ -191,7 +194,7 @@ int main()
                         }
                     }
 
-                    double Lf = 2.67; // this is alread defined in MPC.cpp
+                    double Lf = 2.67; // this is already defined in MPC.cpp
 
                     json msgJson;
 
@@ -255,7 +258,7 @@ int main()
     // We don't need this since we're not using HTTP but if it's removed the
     // program
     // doesn't compile :-(
-    h.onHttpRequest([](uWS::HttpResponse *res, uWS::HttpRequest req, char *data,
+    uWsHub.onHttpRequest([](uWS::HttpResponse *res, uWS::HttpRequest req, char *data,
         size_t, size_t) 
     {
         const std::string s = "<h1>Hello world!</h1>";
@@ -270,12 +273,12 @@ int main()
         }
     });
 
-    h.onConnection([&h](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) 
+    uWsHub.onConnection([&uWsHub](uWS::WebSocket<uWS::SERVER> ws, uWS::HttpRequest req) 
     {
         std::cout << "Connected!!!" << std::endl;
     });
 
-    h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code,
+    uWsHub.onDisconnection([&uWsHub](uWS::WebSocket<uWS::SERVER> ws, int code,
         char *message, size_t length) 
     {
         ws.close();
@@ -283,7 +286,7 @@ int main()
     });
 
     int port = 4567;
-    if (h.listen(port)) 
+    if (uWsHub.listen(port)) 
     {
         std::cout << "Listening to port " << port << std::endl;
     }
@@ -293,5 +296,5 @@ int main()
         return -1;
     }
     
-    h.run();
+    uWsHub.run();
 }
