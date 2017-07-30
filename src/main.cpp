@@ -120,21 +120,93 @@ int main()
                     double psi = j[1]["psi"];
                     double v = j[1]["speed"];
 
+                    // shift car reference angle to 90 degrees
+                    // actually the rotation is not with 90 degrees, but instead its 
+                    // rotating around the yaw of the car
+                    // the reference coordinate system has then zero degrees
+                    for (size_t i(0); i < ptsx.size(); ++i)
+                    {
+                        // shift
+                        double shift_x = ptsx[i] - px;
+                        double shift_y = ptsy[i] - py;
+
+                        // rotate: minus yaw
+                        ptsx[i] = (shift_x * cos(0 - psi) - shift_y * sin(0 - psi));
+                        ptsy[i] = (shift_x * sin(0 - psi) + shift_y * cos(0 - psi));
+                    }
+
+                    double* ptrx = &ptsx[0];
+                    Eigen::Map<Eigen::VectorXd> ptsx_transform(ptrx, 6);
+
+                    double* ptry = &ptsy[0];
+                    Eigen::Map<Eigen::VectorXd> ptsy_transform(ptry, 6);
+
+                    auto coeffs = polyfit(ptsx_transform, ptsy_transform, 3);
+
+                    // calculate cte and epsi
+                    double cte = polyeval(coeffs, 0);
+
+                    //double epsi = psi - atan(coeffs[1] + 2 * px * coeffs[2] + 3 * coeffs[3] * pow(px, 2));
+                    double epsi = -atan(coeffs[1]); // simplified version of above line (because of previous shift and rotation)
+
+                    double steer_value = j[1]["steering_angle"];
+                    
+                    // throttle is not acceleration, but somehow an estimator for the acceleration
+                    double throttle_value = j[1]["throttle"]; 
+
+                    Eigen::VectorXd state(6);
+                    state << 0, 0, 0, v, cte, epsi;
+
                     // TODO: Calculate steering angle and throttle using MPC.
                     // Both are in between [-1, 1].
-                    double steer_value;
-                    double throttle_value;
 
+                    // the coefficients are the path that the vehicle wants to follow
+                    auto vars = mpc.Solve(state, coeffs);
 
-                    json msgJson;
-                    // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
-                    // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-                    msgJson["steering_angle"] = steer_value;
-                    msgJson["throttle"] = throttle_value;
+                    // next_x_vals and next_y_vals are used for visual debugging: it displays
+                    // the line that the vehicle is trying to follow as a yellow line
+                    vector<double> next_x_vals;
+                    vector<double> next_y_vals;
 
-                    //Display the MPC predicted trajectory 
+                    double poly_inc = 2.5; // distance in x axis for which the polynomial is evaluated
+                    int num_points = 25; // 25 points should be displayed
+                    for (int i(1); i < num_points; ++i)
+                    {
+                        next_x_vals.push_back(poly_inc * i);
+                        next_y_vals.push_back(polyeval(coeffs, poly_inc * i));
+                    }
+
+                    // this will be the green line
                     vector<double> mpc_x_vals;
                     vector<double> mpc_y_vals;
+                    for (size_t i(2); i < vars.size(); ++i)
+                    {
+                        if (i % 2 == 0)
+                        {
+                            mpc_x_vals.push_back(vars[i]);
+                        }
+                        else
+                        {
+                            mpc_y_vals.push_back(vars[i]);
+                        }
+                    }
+
+                    double Lf = 2.67; // this is alread defined in MPC.cpp
+
+                    json msgJson;
+
+                    // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
+                    // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
+                    //msgJson["steering_angle"] = steer_value;
+                    //msgJson["throttle"] = throttle_value;
+                    // these are the actually relevant control values that are send to simulator
+                    msgJson["steering_angle"] = vars[0] / (deg2rad(25) * Lf);
+                    msgJson["throttle"] = vars[1];
+
+                    //Display the MPC predicted trajectory 
+                    // already filled above
+                    //vector<double> mpc_x_vals;
+                    //vector<double> mpc_y_vals;
 
                     //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
                     // the points in the simulator are connected by a Green line
@@ -143,15 +215,15 @@ int main()
                     msgJson["mpc_y"] = mpc_y_vals;
 
                     //Display the waypoints/reference line
-                    vector<double> next_x_vals;
-                    vector<double> next_y_vals;
+                    // already filled above
+                    //vector<double> next_x_vals;
+                    //vector<double> next_y_vals;
 
                     //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
                     // the points in the simulator are connected by a Yellow line
 
                     msgJson["next_x"] = next_x_vals;
                     msgJson["next_y"] = next_y_vals;
-
 
                     auto msg = "42[\"steer\"," + msgJson.dump() + "]";
                     std::cout << msg << std::endl;
@@ -165,7 +237,9 @@ int main()
                     //
                     // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
                     // SUBMITTING.
-                    this_thread::sleep_for(chrono::milliseconds(100));
+                    // TODO: enable line below after debugging!
+                    //this_thread::sleep_for(chrono::milliseconds(100));
+
                     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                 }
             }
