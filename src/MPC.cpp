@@ -54,8 +54,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd fittedPolyCoeff
     indepVars[startIdxCTErr] =  ctErr;
     indepVars[startIdxPsiErr] = psiErr;
 
-    cout << "numTimeSteps: " << numTimeSteps << ", numIndepVars: " << numIndepVars 
-        << "\nindepVars: " << indepVars << "\n";
+    //cout << "numTimeSteps: " << numTimeSteps << ", numIndepVars: " << numIndepVars 
+    //    << "\nindepVars: " << indepVars << "\n";
 
     // Lower and upper limits for state vector x0
     Dvector lowerBoundsOfVars(numIndepVars);
@@ -117,9 +117,9 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd fittedPolyCoeff
     upperBoundsOfConstraints[startIdxCTErr] =   ctErr;
     upperBoundsOfConstraints[startIdxPsiErr] =  psiErr;
 
-    cout << "numConstraints: " << numConstraints << "\n";
-    cout << "lowerBoundsOfConstraints: " << lowerBoundsOfConstraints << "\n";
-    cout << "upperBoundsOfConstraints: " << upperBoundsOfConstraints << "\n";
+    //cout << "numConstraints: " << numConstraints << "\n";
+    //cout << "lowerBoundsOfConstraints: " << lowerBoundsOfConstraints << "\n";
+    //cout << "upperBoundsOfConstraints: " << upperBoundsOfConstraints << "\n";
 
     // object that computes objective and constraints
     FG_eval fg_eval(fittedPolyCoeffs);
@@ -161,7 +161,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd fittedPolyCoeff
     auto cost = solution.obj_value;
     std::cout << "Cost " << cost << std::endl;
 
-    cout << "solution size: " << solution.x.size() << ", solution: " << solution.x << "\n";
+    //cout << "solution size: " << solution.x.size() << ", solution: " << solution.x << "\n";
 
     // TODO: Return the first actuator values. The variables can be accessed with
     // `solution.x[i]`.

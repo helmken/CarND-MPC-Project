@@ -203,7 +203,7 @@ int main()
                     //msgJson["steering_angle"] = steer_value;
                     //msgJson["throttle"] = throttle_value;
                     // these are the actually relevant control values that are send to simulator
-                    msgJson["steering_angle"] = vars[0] / (deg2rad(25) * Lf);
+                    msgJson["steering_angle"] = - vars[0] / (deg2rad(25) * Lf);
                     msgJson["throttle"] = vars[1];
 
                     //Display the MPC predicted trajectory 
@@ -229,7 +229,8 @@ int main()
                     msgJson["next_y"] = next_y_vals;
 
                     auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-                    std::cout << msg << std::endl;
+                    
+                    //std::cout << "sending message: " << msg << "\n\n";
 
                     // Latency
                     // The purpose is to mimic real driving conditions where
@@ -241,7 +242,7 @@ int main()
                     // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
                     // SUBMITTING.
                     // TODO: enable line below after debugging!
-                    //this_thread::sleep_for(chrono::milliseconds(100));
+                    this_thread::sleep_for(chrono::milliseconds(100));
 
                     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                 }

@@ -19,7 +19,7 @@ const size_t dimActuator(2);
 const double refCTErr = 0;
 const double refPsiErr = 0;
 //double refVel(100); // TODO: velocity 100 is fast, maybe reduce it
-const double refVel(10);
+const double refVel(40);
 
 // This value assumes the model presented in the classroom is used.
 //
