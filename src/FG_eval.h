@@ -10,16 +10,16 @@ using CppAD::AD;
 
 
 // Prediction horizon T = numTimeSteps * dt
-const size_t numTimeSteps = 10;
-const double dt = 0.1;
+const size_t numTimeSteps(10);
+const double dt(0.1);
+
 
 const size_t dimState(6);
 const size_t dimActuator(2);
 
 const double refCTErr = 0;
 const double refPsiErr = 0;
-//const double refVel(100); // TODO: velocity 100 is fast, maybe reduce it
-const double refVel(50);
+const double refVel(100);
 
 // This value assumes the model presented in the classroom is used.
 //

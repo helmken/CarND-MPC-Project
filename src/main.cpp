@@ -8,8 +8,9 @@
 
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
-#include "MPC.h"
 #include "json.hpp"
+
+#include "MPC.h"
 
 
 using namespace std;
@@ -125,13 +126,26 @@ int main()
                     //}
                     //cout << "\n";
 
-                    const double px = j[1]["x"];
-                    const double py = j[1]["y"];
-                    const double psi = j[1]["psi"];
-                    const double v = j[1]["speed"];
+                    double px = j[1]["x"];
+                    double py = j[1]["y"];
+                    double psi = j[1]["psi"];
+                    double v = j[1]["speed"];
+                    
+                    // steering and throttle values are not necessarily 
+                    // yaw rate and acceleration ...
+                    const double steering = j[1]["steering_angle"];
+                    const double throttle = j[1]["throttle"];
 
-                    // TODO: unused?!? 
-                    //double steer_value = j[1]["steering_angle"];
+                    // do some kind of prediction based on approximated
+                    // yaw rate and acceleration
+                    //double Lf = 2.67; // this is already defined in FT_eval.h
+                    const double Lf = 2.67;
+                    const double actuatorLatency = 0.1; // 0.1 seconds
+                    px += v * cos(psi) * actuatorLatency;
+                    py += v * sin(psi) * actuatorLatency;
+                    psi -= v * steering * actuatorLatency / Lf; // -= to flip steering
+                    v += throttle * actuatorLatency;
+
 
                     vector<double> waypointsTransX;
                     vector<double> waypointsTransY;
@@ -210,7 +224,6 @@ int main()
                     }
                     //cout << "number of green line points: " << greenLineX.size() << "\n";
 
-                    double Lf = 2.67; // this is already defined in MPC.cpp
 
                     json msgJson;
 
