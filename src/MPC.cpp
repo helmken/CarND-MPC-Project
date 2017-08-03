@@ -158,8 +158,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd fittedPolyCoeff
     //ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
 
     // Cost
-    auto cost = solution.obj_value;
-    std::cout << "Cost " << cost << std::endl;
+    //auto cost = solution.obj_value;
+    //std::cout << "Cost " << cost << std::endl;
 
     //cout << "solution size: " << solution.x.size() << ", solution: " << solution.x << "\n";
 

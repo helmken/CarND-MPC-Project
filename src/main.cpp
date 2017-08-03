@@ -5,6 +5,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
@@ -102,7 +103,8 @@ int main()
         // The 4 signifies a websocket message
         // The 2 signifies a websocket event
         string sdata = string(data).substr(0, length);
-        cout << sdata << endl;
+        //cout << sdata << endl;
+        
         if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') 
         {
             string s = hasData(sdata);
@@ -113,44 +115,57 @@ int main()
                 if (event == "telemetry") 
                 {
                     // j[1] is the data JSON object
-                    vector<double> ptsx = j[1]["ptsx"];
-                    vector<double> ptsy = j[1]["ptsy"];
-                    double px = j[1]["x"];
-                    double py = j[1]["y"];
-                    double psi = j[1]["psi"];
-                    double v = j[1]["speed"];
+                    vector<double> waypointsX = j[1]["ptsx"];
+                    vector<double> waypointsY = j[1]["ptsy"];
+                    
+                    //cout << "waypoints: ";
+                    //for (size_t i(0); i < waypointsX.size(); ++i)
+                    //{
+                    //    cout << "(" << waypointsX[i] << ", " << waypointsY[i] << "), ";
+                    //}
+                    //cout << "\n";
+
+                    const double px = j[1]["x"];
+                    const double py = j[1]["y"];
+                    const double psi = j[1]["psi"];
+                    const double v = j[1]["speed"];
 
                     // TODO: unused?!? 
-                    double steer_value = j[1]["steering_angle"];
+                    //double steer_value = j[1]["steering_angle"];
+
+                    vector<double> waypointsTransX;
+                    vector<double> waypointsTransY;
 
                     // shift car reference angle to 90 degrees
-                    // actually the rotation is not with 90 degrees, but instead its 
-                    // rotating around the yaw of the car
+                    // actually the rotation is not with 90 degrees, but
+                    // instead its rotating around the yaw of the car
                     // the reference coordinate system has then zero degrees
-                    for (size_t i(0); i < ptsx.size(); ++i)
+                    for (size_t i(0); i < waypointsX.size(); ++i)
                     {
                         // shift
-                        double shift_x = ptsx[i] - px;
-                        double shift_y = ptsy[i] - py;
+                        const double shift_x = waypointsX[i] - px;
+                        const double shift_y = waypointsY[i] - py;
 
                         // rotate: minus yaw
-                        ptsx[i] = (shift_x * cos(0 - psi) - shift_y * sin(0 - psi));
-                        ptsy[i] = (shift_x * sin(0 - psi) + shift_y * cos(0 - psi));
+                        const double rotX = (shift_x * cos(0 - psi) - shift_y * sin(0 - psi));
+                        const double rotY = (shift_x * sin(0 - psi) + shift_y * cos(0 - psi));
+                        waypointsTransX.push_back(rotX);
+                        waypointsTransY.push_back(rotY);
                     }
 
-                    double* ptrx = &ptsx[0];
-                    Eigen::Map<Eigen::VectorXd> ptsx_transform(ptrx, 6);
+                    double* ptrx = &waypointsTransX[0];
+                    const Eigen::Map<Eigen::VectorXd> ptsx_transform(ptrx, 6);
 
-                    double* ptry = &ptsy[0];
-                    Eigen::Map<Eigen::VectorXd> ptsy_transform(ptry, 6);
+                    double* ptry = &waypointsTransY[0];
+                    const Eigen::Map<Eigen::VectorXd> ptsy_transform(ptry, 6);
 
-                    Eigen::VectorXd fittedPolyCoeffs = polyfit(ptsx_transform, ptsy_transform, 3);
+                    const Eigen::VectorXd fittedPolyCoeffs = polyfit(ptsx_transform, ptsy_transform, 3);
 
                     // calculate cte and epsi
-                    double cte = polyeval(fittedPolyCoeffs, 0);
+                    const double ctErr = polyeval(fittedPolyCoeffs, 0);
 
-                    //double epsi = psi - atan(coeffs[1] + 2 * px * coeffs[2] + 3 * coeffs[3] * pow(px, 2));
-                    double epsi = -atan(fittedPolyCoeffs[1]); // simplified version of above line (because of previous shift and rotation)
+                    //double psiErr = psi - atan(coeffs[1] + 2 * px * coeffs[2] + 3 * coeffs[3] * pow(px, 2));
+                    const double psiErr = -atan(fittedPolyCoeffs[1]); // simplified version of above line (because of previous shift and rotation)
 
                     
                     // throttle is not acceleration, but somehow an estimator for the acceleration
@@ -158,41 +173,42 @@ int main()
                     //double throttle_value = j[1]["throttle"]; 
 
                     Eigen::VectorXd state(6);
-                    state << 0, 0, 0, v, cte, epsi;
+                    state << 0, 0, 0, v, ctErr, psiErr;
 
                     // TODO: Calculate steering angle and throttle using MPC.
                     // Both are in between [-1, 1].
 
                     // the coefficients are the path that the vehicle wants to follow
-                    vector<double> vars = mpc.Solve(state, fittedPolyCoeffs);
+                    const vector<double> vars = mpc.Solve(state, fittedPolyCoeffs);
 
-                    // next_x_vals and next_y_vals are used for visual debugging: they display
-                    // the line that the vehicle is trying to follow as a yellow line
-                    vector<double> next_x_vals;
-                    vector<double> next_y_vals;
+                    // used for visual debugging: display the line that the
+                    // vehicle is trying to follow as a yellow line
+                    vector<double> yellowLineX;
+                    vector<double> yellowLineY;
 
-                    const double poly_inc = 2.5; // distance in x axis for which the polynomial is evaluated
-                    const int num_points = 25; // 25 points should be displayed
-                    for (int i(1); i < num_points; ++i)
+                    const double stepSizeX = 2.5; // distance in x axis for which the polynomial is evaluated
+                    const int numSteps = 25; // 25 points should be displayed
+                    for (int i(1); i < numSteps; ++i)
                     {
-                        next_x_vals.push_back(poly_inc * i);
-                        next_y_vals.push_back(polyeval(fittedPolyCoeffs, poly_inc * i));
+                        yellowLineX.push_back(stepSizeX * i);
+                        yellowLineY.push_back(polyeval(fittedPolyCoeffs, stepSizeX * i));
                     }
 
                     // this will be the green line
-                    vector<double> mpc_x_vals;
-                    vector<double> mpc_y_vals;
+                    vector<double> greenLineX;
+                    vector<double> greenLineY;
                     for (size_t i(2); i < vars.size(); ++i)
                     {
                         if (i % 2 == 0)
                         {
-                            mpc_x_vals.push_back(vars[i]);
+                            greenLineX.push_back(vars[i]);
                         }
                         else
                         {
-                            mpc_y_vals.push_back(vars[i]);
+                            greenLineY.push_back(vars[i]);
                         }
                     }
+                    //cout << "number of green line points: " << greenLineX.size() << "\n";
 
                     double Lf = 2.67; // this is already defined in MPC.cpp
 
@@ -214,8 +230,8 @@ int main()
                     //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
                     // the points in the simulator are connected by a Green line
 
-                    msgJson["mpc_x"] = mpc_x_vals;
-                    msgJson["mpc_y"] = mpc_y_vals;
+                    msgJson["mpc_x"] = greenLineX;
+                    msgJson["mpc_y"] = greenLineY;
 
                     //Display the waypoints/reference line
                     // already filled above
@@ -225,8 +241,8 @@ int main()
                     //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
                     // the points in the simulator are connected by a Yellow line
 
-                    msgJson["next_x"] = next_x_vals;
-                    msgJson["next_y"] = next_y_vals;
+                    msgJson["next_x"] = yellowLineX;
+                    msgJson["next_y"] = yellowLineY;
 
                     auto msg = "42[\"steer\"," + msgJson.dump() + "]";
                     
