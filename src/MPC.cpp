@@ -14,6 +14,9 @@ using CppAD::AD;
 //
 
 MPC::MPC() 
+: m_prevDelta(0.436332 * Lf)
+, m_prevA(1.0)
+, m_initialized(false)
 {
 }
 
@@ -47,6 +50,9 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd fittedPolyCoeff
     }
 
     // Set the initial variable values
+    // in the given state x, y and psi are always zero
+    // x and y values of the optimal solution are returned later as a visual
+    // debugging aid
     indepVars[startIdxX] =      x;
     indepVars[startIdxY] =      y;
     indepVars[startIdxPsi] =    psi;
@@ -78,6 +84,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd fittedPolyCoeff
         lowerBoundsOfVars[i] = -0.436332 * Lf;
         upperBoundsOfVars[i] = 0.436332 * Lf;
     }
+    // suggested improvement:
+    //if (m_initialized)
+    //{
+    //    lowerBoundsOfVars[startIdxDelta] = m_prevDelta;
+    //    upperBoundsOfVars[startIdxDelta] = m_prevDelta;
+    //}
 
     // Acceleration/deceleration upper and lower limits.
     // NOTE: Feel free to change this to something else.
@@ -86,6 +98,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd fittedPolyCoeff
         lowerBoundsOfVars[i] = -1.0;
         upperBoundsOfVars[i] = 1.0;
     }
+    // suggested improvement:
+    //if (m_initialized)
+    //{
+    //    lowerBoundsOfVars[startIdxA] = m_prevA;
+    //    upperBoundsOfVars[startIdxA] = m_prevA;
+    //}
 
     // Number of constraints
     const size_t numConstraints(numTimeSteps * dimState);
@@ -172,6 +190,20 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd fittedPolyCoeff
     vector<double> result;
     result.push_back(solution.x[startIdxDelta]);
     result.push_back(solution.x[startIdxA]);
+    m_prevDelta = solution.x[startIdxDelta];
+    m_prevA = solution.x[startIdxA];
+
+    // suggested improvement: don't take the first value, but instead the
+    // value at the expected delay (assuming that dt = latency = 0.1s)
+    // -> actuator latency was already incorporated in FG_eval, so it makes
+    // no sense to do it here again
+    //result.push_back(solution.x[startIdxDelta + 1]);
+    //result.push_back(solution.x[startIdxA + 1]);
+    //m_prevDelta = solution.x[startIdxDelta + 1];
+    //m_prevA = solution.x[startIdxA + 1];
+
+    m_initialized = true;
+
     // delta and a are actually the important values
 
     // the values below are used to draw the green line, 

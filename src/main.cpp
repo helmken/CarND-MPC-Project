@@ -138,8 +138,7 @@ int main()
 
                     // do some kind of prediction based on approximated
                     // yaw rate and acceleration
-                    //double Lf = 2.67; // this is already defined in FT_eval.h
-                    const double Lf = 2.67;
+                    const double Lf = 2.67; // this is already defined in FT_eval.h
                     const double actuatorLatency = 0.1; // 0.1 seconds
                     px += v * cos(psi) * actuatorLatency;
                     py += v * sin(psi) * actuatorLatency;
@@ -175,22 +174,19 @@ int main()
 
                     const Eigen::VectorXd fittedPolyCoeffs = polyfit(ptsx_transform, ptsy_transform, 3);
 
+
                     // calculate cte and epsi
                     const double ctErr = polyeval(fittedPolyCoeffs, 0);
 
                     //double psiErr = psi - atan(coeffs[1] + 2 * px * coeffs[2] + 3 * coeffs[3] * pow(px, 2));
                     const double psiErr = -atan(fittedPolyCoeffs[1]); // simplified version of above line (because of previous shift and rotation)
 
-                    
-                    // throttle is not acceleration, but somehow an estimator for the acceleration
-                    // TODO: unused?!? 
-                    //double throttle_value = j[1]["throttle"]; 
-
                     Eigen::VectorXd state(6);
                     state << 0, 0, 0, v, ctErr, psiErr;
 
-                    // TODO: Calculate steering angle and throttle using MPC.
-                    // Both are in between [-1, 1].
+
+                    // Calculate steering angle and throttle using MPC, 
+                    // both are in between [-1, 1].
 
                     // the coefficients are the path that the vehicle wants to follow
                     const vector<double> vars = mpc.Solve(state, fittedPolyCoeffs);

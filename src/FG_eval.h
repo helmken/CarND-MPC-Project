@@ -68,8 +68,8 @@ public:
         costAndConstraints[0] = 0;
 
         // Reference State Cost
-        // TODO: Define the cost related the reference state and
-        // any anything you think may be beneficial.
+        // Define the cost related the reference state and
+        // anything you think may be beneficial.
 
         // The part of the cost based on the reference state.
         for (size_t i(0); i < numTimeSteps; ++i)
